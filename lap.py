@@ -126,7 +126,7 @@ if df is not None:
         future = model.make_future_dataframe(periods=365)
         forecast = model.predict(future)
 
-        fig, ax = plt.subplots(figsize=(12, 6))
+        fig, ax = plt.subplots(figsize=(6, 6))
         ax.plot(forecast["ds"], forecast["yhat"], label="Predicted Price", color="green")
         ax.fill_between(forecast["ds"], forecast["yhat_lower"], forecast["yhat_upper"], color="green", alpha=0.3)
         ax.set_title(f"Predicted Stock Prices - {selected_company}")

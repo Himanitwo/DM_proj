@@ -4,7 +4,9 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from prophet import Prophet
 import numpy as np
-st.set_page_config(page_title="stock market dashboard")
+
+st.set_page_config(page_title="stock market dashboard",layout="wide")
+
 file_path = "sorce.xlsx"
 st.cache_data
 def load_data():
@@ -29,7 +31,8 @@ if df is not None:
     st.sidebar.header("Dashboard Filters")
     yearly_trade_value = df.groupby(["Year", "Company"])["Total_Trade_Value"].sum().unstack()
     selected_company = st.sidebar.selectbox("🔍 Select a Company", yearly_trade_value.columns)
-    col1,col2,col3 =st.columns(3,border=True)
+    
+    col1,col2,col3 =st.columns((1,1, 1))
     with col1:
             
             fig, ax = plt.subplots(figsize=(12, 6))
@@ -60,6 +63,7 @@ if df is not None:
     with col3:
        
         latest_data_all = df.groupby("Company").last()
-        trade_price_table = latest_data_all[["Close", "Total_Trade_Value"]].rename(columns={"Close": "Last Trade Price", "Total_Trade Value": "Total Trade Value"})
-        st.table(trade_price_table)
+        trade_price_table = latest_data_all[["Close"]].rename(columns={"Close": "Last Trade Price"})
+        
+        st.dataframe(trade_price_table, width=300, height=200)
     
