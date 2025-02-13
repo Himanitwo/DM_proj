@@ -59,7 +59,7 @@ if df is not None:
             st.pyplot(fig)
     with col3:
        
-        latest_data = df[df["Company"] == selected_company].groupby("Company").last()
-        summary_table = latest_data[["Close", "Total_Trade_Value"]].rename(columns={"Close": "Last Trade Price", "Total_Trade_Value": "Total Trade Value"})
-        st.table(summary_table)
+        latest_data_all = df.groupby("Company").last()
+        trade_price_table = latest_data_all[["Close", "Total_Trade_Value"]].rename(columns={"Close": "Last Trade Price", "Total_Trade Value": "Total Trade Value"})
+        st.table(trade_price_table)
     
