@@ -66,4 +66,10 @@ if df is not None:
         trade_price_table = latest_data_all[["Close"]].rename(columns={"Close": "Last Trade Price"})
         
         st.dataframe(trade_price_table, width=300, height=200)
+    col1, col2 = st.columns(2)
+
     
+
+
+    
+
