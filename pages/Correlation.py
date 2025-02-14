@@ -30,11 +30,29 @@ else:
         
         # Compute Pearson Correlation
         correlation = merged_df[[company1, company2]].corr().iloc[0, 1]
-        st.write(f"### Pearson Correlation: {correlation:.2f}")
+        st.metric(label="Pearson Correlation", value=f"{correlation:.2f}")
         
-        # Display Heatmap
-        fig, ax = plt.subplots()
-        sns.heatmap(merged_df[[company1, company2]].corr(), annot=True, cmap="coolwarm", ax=ax)
-        st.pyplot(fig)
+        # Display Correlation Dataframe
+        st.dataframe(merged_df[[company1, company2]].corr())
+        
+        # Dropdown for graph selection
+        graph_type = st.sidebar.selectbox("Select Graph Type", ["Scatter Plot", "Line Chart", "Heatmap"])
+        
+        # Generate selected graph
+        if graph_type == "Scatter Plot":
+            fig, ax = plt.subplots()
+            sns.scatterplot(x=merged_df[company1], y=merged_df[company2], ax=ax)
+            ax.set_xlabel(company1)
+            ax.set_ylabel(company2)
+            ax.set_title(f"Scatter Plot: {company1} vs {company2}")
+            st.pyplot(fig)
+        
+        elif graph_type == "Line Chart":
+            st.line_chart(merged_df.set_index("Date"))
+        
+        elif graph_type == "Heatmap":
+            fig, ax = plt.subplots()
+            sns.heatmap(merged_df[[company1, company2]].corr(), annot=True, cmap="coolwarm", ax=ax)
+            st.pyplot(fig)
     else:
         st.warning("Please select two different companies for correlation analysis.")
