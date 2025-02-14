@@ -7,12 +7,13 @@ from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 from prophet import Prophet
 
-# 📌 Load Data with Duplicate Handling
+# Load Data with Duplicate Handling
+st.set_page_config(page_title="Stock Market Dashboard", layout="wide")
 @st.cache_data
 def load_data():
     file_path = "sorce.csv"
     df = pd.read_csv(file_path)
-    df.columns = df.columns.str.strip()  # Remove whitespace from column names
+    df.columns = df.columns.str.strip()  
     
     if "Date" in df.columns:
         df["Date"] = pd.to_datetime(df["Date"])
@@ -99,7 +100,7 @@ if df is not None:
         ax.grid(True)
         st.pyplot(fig)
 
-    # 📌 K-Means Clustering with Proper Data Handling
+    # K-Means Clustering 
     st.subheader("📊 Stock Movement Clustering")
 
     # Handle duplicates and pivot properly
@@ -112,22 +113,27 @@ if df is not None:
     # Standardize data for K-Means
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(df_pivot.T)
-
-    # Apply K-Means Clustering
+    col1,col2=st.columns((3,1))
+    
     kmeans = KMeans(n_clusters=3, random_state=42, n_init=10)
     cluster_labels = kmeans.fit_predict(X_scaled)
 
     cluster_df = pd.DataFrame({'Company': df_pivot.columns, 'Cluster': cluster_labels})
+    # K-Means Clustering
+    with col1:
+        cluster_df["X"] = X_scaled[:, 0]
+        cluster_df["Y"] = X_scaled[:, 1]
 
-    st.write("📌 **Company Clusters:**")
-    st.dataframe(cluster_df.sort_values(by="Cluster"))
+        st.subheader("📍 Stock Clusters Visualization")
+        st.scatter_chart(cluster_df, x="X", y="Y", color="Cluster", size=None, use_container_width=True)
 
-    # 📌 Interactive K-Means Scatter Plot in Streamlit
-    cluster_df["X"] = X_scaled[:, 0]
-    cluster_df["Y"] = X_scaled[:, 1]
+    # 📌 Interactive K-Means Scatter Plot 
+    with col2:
 
-    st.subheader("📍 Stock Clusters Visualization")
-    st.scatter_chart(cluster_df, x="X", y="Y", color="Cluster", size=None, use_container_width=True)
+
+
+        st.write("📌 **Company Clusters:**")
+        st.dataframe(cluster_df.sort_values(by="Cluster"))
 
     # Annotate Companies
     # fig, ax = plt.subplots(figsize=(10, 5))
