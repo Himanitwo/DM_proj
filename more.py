@@ -7,7 +7,7 @@ from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 from prophet import Prophet
 
-st.set_page_config(page_title="Stock Market Analysis", layout="wide")
+#st.set_page_config(page_title="Stock Market Analysis", layout="wide")
 
 # Load Data Function
 @st.cache_data
