@@ -9,11 +9,15 @@ df = pd.read_csv(data_path)
 
 # Ensure column names are correct
 df.columns = df.columns.str.strip()
-if "Company" not in df.columns or "Close" not in df.columns:
+if "Company" not in df.columns or "Close" not in df.columns or "Date" not in df.columns:
     st.error("Error: Required columns are missing from the dataset.")
 else:
     st.title("Competitor Stock Correlation Analysis")
     st.sidebar.header("Select Companies")
+    
+    # Convert Date column to datetime
+    df["Date"] = pd.to_datetime(df["Date"])
+    df["Year"] = df["Date"].dt.year
     
     # Get unique companies
     companies = df["Company"].unique()
@@ -21,6 +25,10 @@ else:
     company2 = st.sidebar.selectbox("Select Second Company", companies)
     
     if company1 != company2:
+        # Sidebar dropdown for year selection
+        selected_year = st.sidebar.selectbox("Select Year", sorted(df["Year"].unique(), reverse=True))
+        df = df[df["Year"] == selected_year]
+        
         # Filter data for selected companies
         df1 = df[df["Company"] == company1][["Date", "Close"]].rename(columns={"Close": company1})
         df2 = df[df["Company"] == company2][["Date", "Close"]].rename(columns={"Close": company2})
