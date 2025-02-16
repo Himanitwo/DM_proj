@@ -6,6 +6,8 @@ from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 from prophet import Prophet
 import plotly.graph_objects as go
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 # Set up the Streamlit page
 st.set_page_config(page_title="Stock Market Dashboard", layout="wide")
@@ -149,7 +151,7 @@ if df is not None:
     # -------------------------
     # K-Means Clustering for Risk Analysis (Filtered by Year)
     # -------------------------
-    selected_year_cluster = st.sidebar.selectbox(
+    selected_year_cluster = st.selectbox(
         "Select Year for Clustering", 
         sorted(df["Year"].dropna().unique(), reverse=True),
         key="clustering_year"
@@ -211,14 +213,14 @@ if df is not None:
     # -------------------------
     # Cumulative Returns Chart (Using st.line_chart)
     # -------------------------
-    st.subheader("📈 Cumulative Returns")
+    # st.subheader("📈 Cumulative Returns")
     df_selected = df[df["Company"] == selected_company].copy().sort_values("Date")
     df_selected.set_index("Date", inplace=True)
     df_selected["Daily_Return"] = df_selected["Close"].pct_change()
     # Calculate cumulative returns; starting from a base value of 100
     df_selected["Cumulative_Return"] = (1 + df_selected["Daily_Return"]).cumprod() * 100
 
-    st.line_chart(df_selected["Cumulative_Return"])
+    # st.line_chart(df_selected["Cumulative_Return"])
 
 # -------------------------
 # Volume-Price Relationship Analysis (Dual-Axis Graph)
@@ -308,7 +310,7 @@ if df is not None:
 
 
     
-
+    #here
     st.subheader("📊 SMA, EMA (Manual Calculation), and Volatility (Single Chart)")
 
     # Dropdown for year selection
@@ -324,23 +326,13 @@ if df is not None:
         df_year.set_index("Date", inplace=True)
 
     # Calculate 20-day SMA for the closing price
-    df_year['SMA_20'] = df_year['Close'].rolling(window=20).mean()
+    df_year['SMA_20'] = df_year['Close'].rolling(window=50).mean()
 
     # Define a function to calculate the 20-day EMA manually using the given formula
-    def calculate_manual_ema(series, span=20):
-        multiplier = 2 / (span + 1)
-        ema_values = []
-        for i, price in enumerate(series):
-            if i == 0:
-                # Starting EMA is set to the first closing price
-                ema_values.append(price)
-            else:
-                ema_today = (price * multiplier) + (ema_values[i - 1] * (1 - multiplier))
-                ema_values.append(ema_today)
-        return pd.Series(ema_values, index=series.index)
-
+    
     # Calculate 20-day EMA using our manual function
-    df_year['EMA_20'] = calculate_manual_ema(df_year['Close'], span=20)
+    df_year['EMA_20'] =  df_year['Close'].rolling(window=20).mean()
+
 
     # Calculate volatility (standard deviation of daily returns in percentage)
     df_year['Daily_Return'] = df_year['Close'].pct_change()
@@ -367,7 +359,7 @@ if df is not None:
         x=df_year.index,
         y=df_year['SMA_20'],
         mode='lines',
-        name='20-Day SMA',
+        name='50-Day SMA',
         line=dict(color='green', width=2)
     ))
 
@@ -389,12 +381,98 @@ if df is not None:
 
     st.plotly_chart(fig, use_container_width=True)
 
-    # ---------------------------------------------------------------------
-    # Display Volatility Insights
-    # ---------------------------------------------------------------------
-    st.subheader("📉 Market Volatility")
-    st.info(f"**Volatility:** {volatility:.2f}% (based on daily returns)")
-
-
-
     
+
+
+    col_vol1,col_vol2=st.columns(2)
+# Layout: Yearly Performance & Best/Worst Stocks
+    st.markdown("## 📊 Stock Market Dashboard")
+    with col_vol1:   
+        
+        st.subheader("📊 Volatility Analysis")
+
+        # Calculate daily log returns
+        df_selected = df[df["Company"] == selected_company].sort_values("Date")
+        df_selected["Log Returns"] = np.log(df_selected["Close"] / df_selected["Close"].shift(1))
+        
+        # Compute rolling standard deviation (volatility)
+        df_selected["Volatility"] = df_selected["Log Returns"].rolling(window=30).std()
+        
+        # Plot volatility
+        fig, ax = plt.subplots(figsize=(12, 6))
+        ax.plot(df_selected["Date"], df_selected["Volatility"], label="30-Day Rolling Volatility", color="purple", linewidth=2)
+        ax.axhline(df_selected["Volatility"].mean(), color="red", linestyle="dashed", label="Avg Volatility")
+        ax.set_title(f"Stock Volatility - {selected_company}", fontsize=14, fontweight="bold")
+        ax.set_xlabel("Date")
+        ax.set_ylabel("Volatility (Rolling 30-Day Std Dev)")
+        ax.legend()
+        
+        st.pyplot(fig)
+
+        #st.markdown("---")
+
+        #  Bollinger Bands (Price + Volatility in One Chart)
+        st.subheader("📊 Bollinger Bands (Volatility Indicator)")
+
+        df_selected["SMA_20"] = df_selected["Close"].rolling(window=20).mean()
+        df_selected["Upper_Band"] = df_selected["SMA_20"] + (df_selected["Close"].rolling(window=20).std() * 2)
+        df_selected["Lower_Band"] = df_selected["SMA_20"] - (df_selected["Close"].rolling(window=20).std() * 2)
+
+        fig, ax = plt.subplots(figsize=(12, 6))
+        ax.plot(df_selected["Date"], df_selected["Close"], label="Close Price", color="blue", alpha=0.6)
+        ax.plot(df_selected["Date"], df_selected["SMA_20"], label="20-Day SMA", color="orange", linestyle="dashed")
+        ax.fill_between(df_selected["Date"], df_selected["Upper_Band"], df_selected["Lower_Band"], color="gray", alpha=0.2, label="Bollinger Bands")
+        
+        ax.set_title(f"Bollinger Bands - {selected_company}")
+        ax.legend()
+        st.pyplot(fig)
+
+        # st.markdown("---")
+
+        st.subheader("⚡ Extreme Volatility Events")
+
+        threshold = df_selected["Log Returns"].std() * 2  # 2x standard deviation
+        df_selected["Extreme"] = df_selected["Log Returns"].abs() > threshold
+
+        fig, ax = plt.subplots(figsize=(12, 6))
+        ax.plot(df_selected["Date"], df_selected["Log Returns"], label="Log Returns", color="gray", alpha=0.6)
+        ax.scatter(df_selected[df_selected["Extreme"]]["Date"], 
+                df_selected[df_selected["Extreme"]]["Log Returns"], 
+                color="red", label="Extreme Events", zorder=3)
+
+        ax.set_title(f"Extreme Volatility Events - {selected_company}")
+        ax.legend()
+        st.pyplot(fig)
+
+        st.markdown("💡 *Use filters to analyze different stocks and trends.*")
+    with col_vol2:    
+        st.subheader("📊 Historical Volatility Heatmap")
+
+        df_selected["Month"] = df_selected["Date"].dt.month
+        df_selected["Year"] = df_selected["Date"].dt.year
+        volatility_pivot = df_selected.pivot_table(index="Year", columns="Month", values="Volatility", aggfunc="mean")
+
+        fig, ax = plt.subplots(figsize=(10, 6))
+        sns.heatmap(volatility_pivot, cmap="coolwarm", annot=True, fmt=".4f", linewidths=0.5, ax=ax)
+
+        ax.set_title(f"Volatility Heatmap - {selected_company}")
+        st.pyplot(fig)
+
+        #st.markdown("---")
+        st.subheader("📊 Volatility Clustering")
+
+        fig, ax = plt.subplots(figsize=(12, 6))
+        scatter = ax.scatter(df_selected["Date"], df_selected["Log Returns"], 
+                            c=df_selected["Volatility"], cmap="coolwarm", edgecolors="black", alpha=0.7)
+
+        ax.set_title(f"Volatility Clustering - {selected_company}")
+        ax.set_xlabel("Date")
+        ax.set_ylabel("Log Returns")
+        plt.colorbar(scatter, label="Volatility Level")
+        
+        st.pyplot(fig)
+
+        #st.markdown("---")
+
+        
+
