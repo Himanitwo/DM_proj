@@ -86,31 +86,67 @@ if df is not None:
     
     with col_forecast:
         company_data = df[df["Company"] == selected_company][["Date", "Close"]].rename(columns={"Date": "ds", "Close": "y"})
-        if not company_data.empty:
-            company_data["7-day MA"] = company_data["y"].rolling(window=7).mean()
-            company_data["30-day MA"] = company_data["y"].rolling(window=30).mean()
-            model_prophet = Prophet()
-            model_prophet.fit(company_data[["ds", "y"]])
-            future = model_prophet.make_future_dataframe(periods=365)
-            forecast = model_prophet.predict(future)
-            forecast_data = forecast[["ds", "yhat"]].set_index("ds")
-            actual_data = company_data.set_index("ds")
-            combined_data = actual_data.join(forecast_data, how="outer")
-            combined_data = combined_data.apply(pd.to_numeric, errors='coerce')
-            combined_data = combined_data.select_dtypes(include=[np.number])
-            st.subheader(f"📈 Stock Price Forecast - {selected_company}")
-            st.line_chart(combined_data)
+
+        if len(company_data) > 0:
+            model = Prophet()
+            model.fit(company_data)
+            
+            future = model.make_future_dataframe(periods=365)
+            forecast = model.predict(future)
+            
+            # Create figure
+            fig = go.Figure()
+            
+            # Actual data
+            fig.add_trace(go.Scatter(
+                x=company_data["ds"], 
+                y=company_data["y"], 
+                mode='lines', 
+                name='Actual Data',
+                line=dict(color='blue')
+            ))
+            
+            # Predicted data
+            fig.add_trace(go.Scatter(
+                x=forecast["ds"], 
+                y=forecast["yhat"], 
+                mode='lines', 
+                name='Predicted Data',
+                line=dict(color='red')
+            ))
+            
+            # Confidence interval
+            fig.add_trace(go.Scatter(
+                x=forecast["ds"].tolist() + forecast["ds"].tolist()[::-1],
+                y=forecast["yhat_upper"].tolist() + forecast["yhat_lower"].tolist()[::-1],
+                fill='toself',
+                fillcolor='rgba(255, 192, 203, 0.3)',
+                line=dict(color='rgba(255,255,255,0)'),
+                name='Confidence Interval'
+            ))
+            
+            # Layout
+            fig.update_layout(
+                title=f"Stock Price Forecast - {selected_company}",
+                xaxis_title='Date',
+                yaxis_title='Stock Price ($)',
+                template='plotly_white'
+            )
+            
+            # Display plot in Streamlit
+            st.plotly_chart(fig)
+
     
     with col_prices:
         latest_data_all = df.groupby("Company").last()
         trade_price_table = latest_data_all[["Close"]].rename(columns={"Close": "Last Trade Price"})
-        st.subheader("💰 Latest Trade Prices")
+        st.subheader("Latest Trade Prices")
         st.dataframe(trade_price_table, use_container_width=True)
     
     # -------------------------
     # Trend Analysis with Linear Regression & Suggestion Box
     # -------------------------
-    selected_year = st.selectbox("📅 Select Year for Trend Analysis", sorted(df["Year"].dropna().unique(), reverse=True))
+    selected_year = st.selectbox("Select Year for Trend Analysis", sorted(df["Year"].dropna().unique(), reverse=True))
     df_filtered = df[(df["Company"] == selected_company) & (df["Year"] == selected_year)].copy()
     col_gr,col_tab=st.columns(2)
     with col_gr:
@@ -127,7 +163,7 @@ if df is not None:
             lr_model.fit(X, y)
             df_filtered['Trend'] = lr_model.predict(X)
             # Use st.line_chart for an interactive trend graph.
-            st.subheader(f"📊 Stock Price Trends - {selected_company} ({selected_year})")
+            st.subheader(f"Stock Price Trends - {selected_company} ({selected_year})")
             trend_chart_data = df_filtered.set_index("Date")[["Close", "7-day MA", "30-day MA", "Trend"]]
             st.line_chart(trend_chart_data)
     with col_tab:
@@ -194,7 +230,7 @@ if df is not None:
 
     col_cluster, col_cluster_details = st.columns((2, 1))
     with col_cluster:
-        st.subheader("📍 Stock Clusters Visualization (Filtered by Year)")
+        st.subheader("Stock Clusters Visualization (Filtered by Year)")
         st.scatter_chart(cluster_df, x="X", y="Y", color="Cluster", use_container_width=True)
     with col_cluster_details:
         st.subheader("Cluster & Risk Details")
@@ -228,7 +264,7 @@ if df is not None:
 
     import plotly.express as px
 
-    st.subheader("📊 Volume-Price Relationship (Bar Chart)")
+    st.subheader("Volume-Price Relationship (Bar Chart)")
 
     # Dropdown for selecting the number of years
     years = st.selectbox("Select number of years:", [3, 4, 5], index=2)  # Default is 5 years
@@ -305,147 +341,51 @@ if df is not None:
             - May signal a weak downtrend or a possible reversal  
             """
         )
+    st.subheader("Trend indicators🔍")
+    df["SMA_20"] = df["Close"].rolling(window=20).mean()
 
-    
+# 2️⃣ **Calculate Price Change (%) Over the Last 30 Days**
+    df["Price Change (%)"] = (df["Close"] - df["Close"].shift(30)) / df["Close"].shift(30) * 100
+
+    # 3**Determine Overall Trend Direction**
+    latest_sma = df["SMA_20"].iloc[-1]  # Most recent SMA value
+    latest_price = df["Close"].iloc[-1]  # Most recent closing price
+
+    if latest_price > latest_sma * 1.02:  # If price is 2% above SMA
+        trend = "📈 Upward"
+    elif latest_price < latest_sma * 0.98:  # If price is 2% below SMA
+        trend = "📉 Downward"
+    else:
+        trend = "Sideways"
+
+    # 4️⃣ **Breakout Alert: If Price Moves Significantly Above/Below SMA**
+    if latest_price > latest_sma * 1.05:  # If price is 5% above SMA
+        breakout_alert = "Strong Uptrend (Breakout Above SMA)"
+    elif latest_price < latest_sma * 0.95:  # If price is 5% below SMA
+        breakout_alert = "Potential Downtrend (Breakout Below SMA)"
+    else:
+        breakout_alert = "No Significant Breakout"
+
+
+    trend_data = {
+    "Metric": ["20-Day SMA", "Price Change (%)", "Overall Trend", "Breakout Alert"],
+    "Value": [f"{latest_sma:.2f}", f"{df['Price Change (%)'].iloc[-1]:.2f}%", trend, breakout_alert]
+    }
+
+    trend_df = pd.DataFrame(trend_data)
+    st.table(trend_df)
+
+    # Display Key Metrics
+    print(f"20-Day Moving Average (SMA): {latest_sma:.2f}")
+    print(f" Price Change (Last 30 Days): {df['Price Change (%)'].iloc[-1]:.2f}%")
+    print(f"Overall Trend Direction: {trend}")
+    print(f"Breakout Alert: {breakout_alert}")
 
 
     
     #here
     
-
-    # ---------------------------------------------------------------------
-    # Create a single area chart with the closing price, SMA, and manually calculated EMA
-    # ---------------------------------------------------------------------
-    fig = go.Figure()
-
-    # Closing Price as an area chart
-    fig.add_trace(go.Scatter(
-        x=df_year.index,
-        y=df_year['Close'],
-        mode='lines',
-        name='Close Price',
-        line=dict(color='blue'),
-        fill='tozeroy',
-        opacity=0.5
-    ))
-
-    # 20-Day SMA Line
-    fig.add_trace(go.Scatter(
-        x=df_year.index,
-        y=df_year['SMA_20'],
-        mode='lines',
-        name='50-Day SMA',
-        line=dict(color='green', width=2)
-    ))
-
-    # 20-Day EMA Line (Manual Calculation)
-    fig.add_trace(go.Scatter(
-        x=df_year.index,
-        y=df_year['EMA_20'],
-        mode='lines',
-        name='20-Day EMA',
-        line=dict(color='red', width=2)
-    ))
-
-    fig.update_layout(
-        title=f"20-Day SMA & EMA for {selected_company} in {selected_year}",
-        xaxis_title="Date",
-        yaxis_title="Price",
-        template="plotly_white"
-    )
-
-    st.plotly_chart(fig, use_container_width=True)
-
     
-
-
-    col_vol1,col_vol2=st.columns(2)
-# Layout: Yearly Performance & Best/Worst Stocks
-    st.markdown("## 📊 Stock Market Dashboard")
-    with col_vol1:   
-        
-        st.subheader("📊 Volatility Analysis")
-
-        # Calculate daily log returns
-        df_selected = df[df["Company"] == selected_company].sort_values("Date")
-        df_selected["Log Returns"] = np.log(df_selected["Close"] / df_selected["Close"].shift(1))
-        
-        # Compute rolling standard deviation (volatility)
-        df_selected["Volatility"] = df_selected["Log Returns"].rolling(window=30).std()
-        
-        # Plot volatility
-        fig, ax = plt.subplots(figsize=(12, 6))
-        ax.plot(df_selected["Date"], df_selected["Volatility"], label="30-Day Rolling Volatility", color="purple", linewidth=2)
-        ax.axhline(df_selected["Volatility"].mean(), color="red", linestyle="dashed", label="Avg Volatility")
-        ax.set_title(f"Stock Volatility - {selected_company}", fontsize=14, fontweight="bold")
-        ax.set_xlabel("Date")
-        ax.set_ylabel("Volatility (Rolling 30-Day Std Dev)")
-        ax.legend()
-        
-        st.pyplot(fig)
-
-        #st.markdown("---")
-
-        #  Bollinger Bands (Price + Volatility in One Chart)
-        st.subheader("📊 Bollinger Bands (Volatility Indicator)")
-
-        df_selected["SMA_20"] = df_selected["Close"].rolling(window=20).mean()
-        df_selected["Upper_Band"] = df_selected["SMA_20"] + (df_selected["Close"].rolling(window=20).std() * 2)
-        df_selected["Lower_Band"] = df_selected["SMA_20"] - (df_selected["Close"].rolling(window=20).std() * 2)
-
-        fig, ax = plt.subplots(figsize=(12, 6))
-        ax.plot(df_selected["Date"], df_selected["Close"], label="Close Price", color="blue", alpha=0.6)
-        ax.plot(df_selected["Date"], df_selected["SMA_20"], label="20-Day SMA", color="orange", linestyle="dashed")
-        ax.fill_between(df_selected["Date"], df_selected["Upper_Band"], df_selected["Lower_Band"], color="gray", alpha=0.2, label="Bollinger Bands")
-        
-        ax.set_title(f"Bollinger Bands - {selected_company}")
-        ax.legend()
-        st.pyplot(fig)
-
-        # st.markdown("---")
-
-        st.subheader("⚡ Extreme Volatility Events")
-
-        threshold = df_selected["Log Returns"].std() * 2  # 2x standard deviation
-        df_selected["Extreme"] = df_selected["Log Returns"].abs() > threshold
-
-        fig, ax = plt.subplots(figsize=(12, 6))
-        ax.plot(df_selected["Date"], df_selected["Log Returns"], label="Log Returns", color="gray", alpha=0.6)
-        ax.scatter(df_selected[df_selected["Extreme"]]["Date"], 
-                df_selected[df_selected["Extreme"]]["Log Returns"], 
-                color="red", label="Extreme Events", zorder=3)
-
-        ax.set_title(f"Extreme Volatility Events - {selected_company}")
-        ax.legend()
-        st.pyplot(fig)
-
-        st.markdown("💡 *Use filters to analyze different stocks and trends.*")
-    with col_vol2:    
-        st.subheader("📊 Historical Volatility Heatmap")
-
-        df_selected["Month"] = df_selected["Date"].dt.month
-        df_selected["Year"] = df_selected["Date"].dt.year
-        volatility_pivot = df_selected.pivot_table(index="Year", columns="Month", values="Volatility", aggfunc="mean")
-
-        fig, ax = plt.subplots(figsize=(10, 6))
-        sns.heatmap(volatility_pivot, cmap="coolwarm", annot=True, fmt=".4f", linewidths=0.5, ax=ax)
-
-        ax.set_title(f"Volatility Heatmap - {selected_company}")
-        st.pyplot(fig)
-
-        #st.markdown("---")
-        st.subheader("📊 Volatility Clustering")
-
-        fig, ax = plt.subplots(figsize=(12, 6))
-        scatter = ax.scatter(df_selected["Date"], df_selected["Log Returns"], 
-                            c=df_selected["Volatility"], cmap="coolwarm", edgecolors="black", alpha=0.7)
-
-        ax.set_title(f"Volatility Clustering - {selected_company}")
-        ax.set_xlabel("Date")
-        ax.set_ylabel("Log Returns")
-        plt.colorbar(scatter, label="Volatility Level")
-        
-        st.pyplot(fig)
 
         #st.markdown("---")
 

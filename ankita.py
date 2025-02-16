@@ -18,7 +18,7 @@ def load_data():
     df.columns = df.columns.str.strip() 
 
     # Display column names for debugging
-    st.write("Columns in dataset:", df.columns.tolist())
+    # st.write("Columns in dataset:", df.columns.tolist())
 
     # Ensure 'Date' column is in datetime format
     if "Date" in df.columns:
@@ -55,29 +55,32 @@ if df is not None:
 
         # Layout: Yearly Performance & Best/Worst Stocks
         st.markdown("## 📊 Stock Market Dashboard")
-        
-        with st.expander("ℹ️ About Stock Market Dashboard"):
-            st.subheader("📊 Volatility Analysis")
+        col_vol1,col_vol2=st.columns(2)
+# Layout: Yearly Performance & Best/Worst Stocks
     
-            # Calculate daily log returns
-            df_selected = df[df["Company"] == selected_company].sort_values("Date")
-            df_selected["Log Returns"] = np.log(df_selected["Close"] / df_selected["Close"].shift(1))
-            
-            # Compute rolling standard deviation (volatility)
-            df_selected["Volatility"] = df_selected["Log Returns"].rolling(window=30).std()
-            
-            # Plot volatility
-            fig, ax = plt.subplots(figsize=(12, 6))
-            ax.plot(df_selected["Date"], df_selected["Volatility"], label="30-Day Rolling Volatility", color="purple", linewidth=2)
-            ax.axhline(df_selected["Volatility"].mean(), color="red", linestyle="dashed", label="Avg Volatility")
-            ax.set_title(f"Stock Volatility - {selected_company}", fontsize=14, fontweight="bold")
-            ax.set_xlabel("Date")
-            ax.set_ylabel("Volatility (Rolling 30-Day Std Dev)")
-            ax.legend()
-            
-            st.pyplot(fig)
+    with col_vol1:   
+        
+        st.subheader("📊 Volatility Analysis")
 
-        st.markdown("---")
+        # Calculate daily log returns
+        df_selected = df[df["Company"] == selected_company].sort_values("Date")
+        df_selected["Log Returns"] = np.log(df_selected["Close"] / df_selected["Close"].shift(1))
+        
+        # Compute rolling standard deviation (volatility)
+        df_selected["Volatility"] = df_selected["Log Returns"].rolling(window=30).std()
+        
+        # Plot volatility
+        fig, ax = plt.subplots(figsize=(12, 6))
+        ax.plot(df_selected["Date"], df_selected["Volatility"], label="30-Day Rolling Volatility", color="purple", linewidth=2)
+        ax.axhline(df_selected["Volatility"].mean(), color="red", linestyle="dashed", label="Avg Volatility")
+        ax.set_title(f"Stock Volatility - {selected_company}", fontsize=14, fontweight="bold")
+        ax.set_xlabel("Date")
+        ax.set_ylabel("Volatility (Rolling 30-Day Std Dev)")
+        ax.legend()
+        
+        st.pyplot(fig)
+
+        #st.markdown("---")
 
         #  Bollinger Bands (Price + Volatility in One Chart)
         st.subheader("📊 Bollinger Bands (Volatility Indicator)")
@@ -95,35 +98,7 @@ if df is not None:
         ax.legend()
         st.pyplot(fig)
 
-        st.markdown("---")
-
-        st.subheader("📊 Historical Volatility Heatmap")
-
-        df_selected["Month"] = df_selected["Date"].dt.month
-        df_selected["Year"] = df_selected["Date"].dt.year
-        volatility_pivot = df_selected.pivot_table(index="Year", columns="Month", values="Volatility", aggfunc="mean")
-
-        fig, ax = plt.subplots(figsize=(10, 6))
-        sns.heatmap(volatility_pivot, cmap="coolwarm", annot=True, fmt=".4f", linewidths=0.5, ax=ax)
-
-        ax.set_title(f"Volatility Heatmap - {selected_company}")
-        st.pyplot(fig)
-
-        st.markdown("---")
-        st.subheader("📊 Volatility Clustering")
-
-        fig, ax = plt.subplots(figsize=(12, 6))
-        scatter = ax.scatter(df_selected["Date"], df_selected["Log Returns"], 
-                            c=df_selected["Volatility"], cmap="coolwarm", edgecolors="black", alpha=0.7)
-
-        ax.set_title(f"Volatility Clustering - {selected_company}")
-        ax.set_xlabel("Date")
-        ax.set_ylabel("Log Returns")
-        plt.colorbar(scatter, label="Volatility Level")
-        
-        st.pyplot(fig)
-
-        st.markdown("---")
+        # st.markdown("---")
 
         st.subheader("⚡ Extreme Volatility Events")
 
@@ -141,5 +116,30 @@ if df is not None:
         st.pyplot(fig)
 
         st.markdown("💡 *Use filters to analyze different stocks and trends.*")
+    with col_vol2:    
+        st.subheader("📊 Historical Volatility Heatmap")
 
+        df_selected["Month"] = df_selected["Date"].dt.month
+        df_selected["Year"] = df_selected["Date"].dt.year
+        volatility_pivot = df_selected.pivot_table(index="Year", columns="Month", values="Volatility", aggfunc="mean")
 
+        fig, ax = plt.subplots(figsize=(10, 6))
+        sns.heatmap(volatility_pivot, cmap="coolwarm", annot=True, fmt=".4f", linewidths=0.5, ax=ax)
+
+        ax.set_title(f"Volatility Heatmap - {selected_company}")
+        st.pyplot(fig)
+
+        #st.markdown("---")
+        st.subheader("📊 Volatility Clustering")
+
+        fig, ax = plt.subplots(figsize=(12, 6))
+        scatter = ax.scatter(df_selected["Date"], df_selected["Log Returns"], 
+                            c=df_selected["Volatility"], cmap="coolwarm", edgecolors="black", alpha=0.7)
+
+        ax.set_title(f"Volatility Clustering - {selected_company}")
+        ax.set_xlabel("Date")
+        ax.set_ylabel("Log Returns")
+        plt.colorbar(scatter, label="Volatility Level")
+        
+        st.pyplot(fig)
+        
