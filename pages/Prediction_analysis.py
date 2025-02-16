@@ -86,31 +86,67 @@ if df is not None:
     
     with col_forecast:
         company_data = df[df["Company"] == selected_company][["Date", "Close"]].rename(columns={"Date": "ds", "Close": "y"})
-        if not company_data.empty:
-            company_data["7-day MA"] = company_data["y"].rolling(window=7).mean()
-            company_data["30-day MA"] = company_data["y"].rolling(window=30).mean()
-            model_prophet = Prophet()
-            model_prophet.fit(company_data[["ds", "y"]])
-            future = model_prophet.make_future_dataframe(periods=365)
-            forecast = model_prophet.predict(future)
-            forecast_data = forecast[["ds", "yhat"]].set_index("ds")
-            actual_data = company_data.set_index("ds")
-            combined_data = actual_data.join(forecast_data, how="outer")
-            combined_data = combined_data.apply(pd.to_numeric, errors='coerce')
-            combined_data = combined_data.select_dtypes(include=[np.number])
-            st.subheader(f"📈 Stock Price Forecast - {selected_company}")
-            st.line_chart(combined_data)
+
+        if len(company_data) > 0:
+            model = Prophet()
+            model.fit(company_data)
+            
+            future = model.make_future_dataframe(periods=365)
+            forecast = model.predict(future)
+            
+            # Create figure
+            fig = go.Figure()
+            
+            # Actual data
+            fig.add_trace(go.Scatter(
+                x=company_data["ds"], 
+                y=company_data["y"], 
+                mode='lines', 
+                name='Actual Data',
+                line=dict(color='blue')
+            ))
+            
+            # Predicted data
+            fig.add_trace(go.Scatter(
+                x=forecast["ds"], 
+                y=forecast["yhat"], 
+                mode='lines', 
+                name='Predicted Data',
+                line=dict(color='red')
+            ))
+            
+            # Confidence interval
+            fig.add_trace(go.Scatter(
+                x=forecast["ds"].tolist() + forecast["ds"].tolist()[::-1],
+                y=forecast["yhat_upper"].tolist() + forecast["yhat_lower"].tolist()[::-1],
+                fill='toself',
+                fillcolor='rgba(255, 192, 203, 0.3)',
+                line=dict(color='rgba(255,255,255,0)'),
+                name='Confidence Interval'
+            ))
+            
+            # Layout
+            fig.update_layout(
+                title=f"Stock Price Forecast - {selected_company}",
+                xaxis_title='Date',
+                yaxis_title='Stock Price ($)',
+                template='plotly_white'
+            )
+            
+            # Display plot in Streamlit
+            st.plotly_chart(fig)
+
     
     with col_prices:
         latest_data_all = df.groupby("Company").last()
         trade_price_table = latest_data_all[["Close"]].rename(columns={"Close": "Last Trade Price"})
-        st.subheader("💰 Latest Trade Prices")
+        st.subheader("Latest Trade Prices")
         st.dataframe(trade_price_table, use_container_width=True)
     
     # -------------------------
     # Trend Analysis with Linear Regression & Suggestion Box
     # -------------------------
-    selected_year = st.selectbox("📅 Select Year for Trend Analysis", sorted(df["Year"].dropna().unique(), reverse=True))
+    selected_year = st.selectbox("Select Year for Trend Analysis", sorted(df["Year"].dropna().unique(), reverse=True))
     df_filtered = df[(df["Company"] == selected_company) & (df["Year"] == selected_year)].copy()
     col_gr,col_tab=st.columns(2)
     with col_gr:
@@ -127,7 +163,7 @@ if df is not None:
             lr_model.fit(X, y)
             df_filtered['Trend'] = lr_model.predict(X)
             # Use st.line_chart for an interactive trend graph.
-            st.subheader(f"📊 Stock Price Trends - {selected_company} ({selected_year})")
+            st.subheader(f"Stock Price Trends - {selected_company} ({selected_year})")
             trend_chart_data = df_filtered.set_index("Date")[["Close", "7-day MA", "30-day MA", "Trend"]]
             st.line_chart(trend_chart_data)
     with col_tab:
@@ -194,7 +230,7 @@ if df is not None:
 
     col_cluster, col_cluster_details = st.columns((2, 1))
     with col_cluster:
-        st.subheader("📍 Stock Clusters Visualization (Filtered by Year)")
+        st.subheader("Stock Clusters Visualization (Filtered by Year)")
         st.scatter_chart(cluster_df, x="X", y="Y", color="Cluster", use_container_width=True)
     with col_cluster_details:
         st.subheader("Cluster & Risk Details")
@@ -324,11 +360,11 @@ if df is not None:
 
     # 4️⃣ **Breakout Alert: If Price Moves Significantly Above/Below SMA**
     if latest_price > latest_sma * 1.05:  # If price is 5% above SMA
-        breakout_alert = "🚀 Strong Uptrend (Breakout Above SMA)"
+        breakout_alert = "Strong Uptrend (Breakout Above SMA)"
     elif latest_price < latest_sma * 0.95:  # If price is 5% below SMA
-        breakout_alert = "⚠️ Potential Downtrend (Breakout Below SMA)"
+        breakout_alert = "Potential Downtrend (Breakout Below SMA)"
     else:
-        breakout_alert = "🔍 No Significant Breakout"
+        breakout_alert = "No Significant Breakout"
 
 
     trend_data = {
@@ -340,9 +376,9 @@ if df is not None:
     st.table(trend_df)
 
     # Display Key Metrics
-    print(f"📊 20-Day Moving Average (SMA): {latest_sma:.2f}")
-    print(f"📊 Price Change (Last 30 Days): {df['Price Change (%)'].iloc[-1]:.2f}%")
-    print(f"📊 Overall Trend Direction: {trend}")
-    print(f"📊 Breakout Alert: {breakout_alert}")
+    print(f"20-Day Moving Average (SMA): {latest_sma:.2f}")
+    print(f" Price Change (Last 30 Days): {df['Price Change (%)'].iloc[-1]:.2f}%")
+    print(f"Overall Trend Direction: {trend}")
+    print(f"Breakout Alert: {breakout_alert}")
 
 
