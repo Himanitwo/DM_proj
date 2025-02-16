@@ -305,100 +305,51 @@ if df is not None:
             - May signal a weak downtrend or a possible reversal  
             """
         )
+    st.subheader("Trend indicators🔍")
+    df["SMA_20"] = df["Close"].rolling(window=20).mean()
 
-    
+# 2️⃣ **Calculate Price Change (%) Over the Last 30 Days**
+    df["Price Change (%)"] = (df["Close"] - df["Close"].shift(30)) / df["Close"].shift(30) * 100
+
+    # 3**Determine Overall Trend Direction**
+    latest_sma = df["SMA_20"].iloc[-1]  # Most recent SMA value
+    latest_price = df["Close"].iloc[-1]  # Most recent closing price
+
+    if latest_price > latest_sma * 1.02:  # If price is 2% above SMA
+        trend = "📈 Upward"
+    elif latest_price < latest_sma * 0.98:  # If price is 2% below SMA
+        trend = "📉 Downward"
+    else:
+        trend = "Sideways"
+
+    # 4️⃣ **Breakout Alert: If Price Moves Significantly Above/Below SMA**
+    if latest_price > latest_sma * 1.05:  # If price is 5% above SMA
+        breakout_alert = "🚀 Strong Uptrend (Breakout Above SMA)"
+    elif latest_price < latest_sma * 0.95:  # If price is 5% below SMA
+        breakout_alert = "⚠️ Potential Downtrend (Breakout Below SMA)"
+    else:
+        breakout_alert = "🔍 No Significant Breakout"
+
+
+    trend_data = {
+    "Metric": ["20-Day SMA", "Price Change (%)", "Overall Trend", "Breakout Alert"],
+    "Value": [f"{latest_sma:.2f}", f"{df['Price Change (%)'].iloc[-1]:.2f}%", trend, breakout_alert]
+    }
+
+    trend_df = pd.DataFrame(trend_data)
+    st.table(trend_df)
+
+    # Display Key Metrics
+    print(f"📊 20-Day Moving Average (SMA): {latest_sma:.2f}")
+    print(f"📊 Price Change (Last 30 Days): {df['Price Change (%)'].iloc[-1]:.2f}%")
+    print(f"📊 Overall Trend Direction: {trend}")
+    print(f"📊 Breakout Alert: {breakout_alert}")
 
 
     
     #here
     
-    col_vol1,col_vol2=st.columns(2)
-# Layout: Yearly Performance & Best/Worst Stocks
-    st.markdown("## 📊 Stock Market Dashboard")
-    with col_vol1:   
-        
-        st.subheader("📊 Volatility Analysis")
-
-        # Calculate daily log returns
-        df_selected = df[df["Company"] == selected_company].sort_values("Date")
-        df_selected["Log Returns"] = np.log(df_selected["Close"] / df_selected["Close"].shift(1))
-        
-        # Compute rolling standard deviation (volatility)
-        df_selected["Volatility"] = df_selected["Log Returns"].rolling(window=30).std()
-        
-        # Plot volatility
-        fig, ax = plt.subplots(figsize=(12, 6))
-        ax.plot(df_selected["Date"], df_selected["Volatility"], label="30-Day Rolling Volatility", color="purple", linewidth=2)
-        ax.axhline(df_selected["Volatility"].mean(), color="red", linestyle="dashed", label="Avg Volatility")
-        ax.set_title(f"Stock Volatility - {selected_company}", fontsize=14, fontweight="bold")
-        ax.set_xlabel("Date")
-        ax.set_ylabel("Volatility (Rolling 30-Day Std Dev)")
-        ax.legend()
-        
-        st.pyplot(fig)
-
-        #st.markdown("---")
-
-        #  Bollinger Bands (Price + Volatility in One Chart)
-        st.subheader("📊 Bollinger Bands (Volatility Indicator)")
-
-        df_selected["SMA_20"] = df_selected["Close"].rolling(window=20).mean()
-        df_selected["Upper_Band"] = df_selected["SMA_20"] + (df_selected["Close"].rolling(window=20).std() * 2)
-        df_selected["Lower_Band"] = df_selected["SMA_20"] - (df_selected["Close"].rolling(window=20).std() * 2)
-
-        fig, ax = plt.subplots(figsize=(12, 6))
-        ax.plot(df_selected["Date"], df_selected["Close"], label="Close Price", color="blue", alpha=0.6)
-        ax.plot(df_selected["Date"], df_selected["SMA_20"], label="20-Day SMA", color="orange", linestyle="dashed")
-        ax.fill_between(df_selected["Date"], df_selected["Upper_Band"], df_selected["Lower_Band"], color="gray", alpha=0.2, label="Bollinger Bands")
-        
-        ax.set_title(f"Bollinger Bands - {selected_company}")
-        ax.legend()
-        st.pyplot(fig)
-
-        # st.markdown("---")
-
-        st.subheader("⚡ Extreme Volatility Events")
-
-        threshold = df_selected["Log Returns"].std() * 2  # 2x standard deviation
-        df_selected["Extreme"] = df_selected["Log Returns"].abs() > threshold
-
-        fig, ax = plt.subplots(figsize=(12, 6))
-        ax.plot(df_selected["Date"], df_selected["Log Returns"], label="Log Returns", color="gray", alpha=0.6)
-        ax.scatter(df_selected[df_selected["Extreme"]]["Date"], 
-                df_selected[df_selected["Extreme"]]["Log Returns"], 
-                color="red", label="Extreme Events", zorder=3)
-
-        ax.set_title(f"Extreme Volatility Events - {selected_company}")
-        ax.legend()
-        st.pyplot(fig)
-
-        st.markdown("💡 *Use filters to analyze different stocks and trends.*")
-    with col_vol2:    
-        st.subheader("📊 Historical Volatility Heatmap")
-
-        df_selected["Month"] = df_selected["Date"].dt.month
-        df_selected["Year"] = df_selected["Date"].dt.year
-        volatility_pivot = df_selected.pivot_table(index="Year", columns="Month", values="Volatility", aggfunc="mean")
-
-        fig, ax = plt.subplots(figsize=(10, 6))
-        sns.heatmap(volatility_pivot, cmap="coolwarm", annot=True, fmt=".4f", linewidths=0.5, ax=ax)
-
-        ax.set_title(f"Volatility Heatmap - {selected_company}")
-        st.pyplot(fig)
-
-        #st.markdown("---")
-        st.subheader("📊 Volatility Clustering")
-
-        fig, ax = plt.subplots(figsize=(12, 6))
-        scatter = ax.scatter(df_selected["Date"], df_selected["Log Returns"], 
-                            c=df_selected["Volatility"], cmap="coolwarm", edgecolors="black", alpha=0.7)
-
-        ax.set_title(f"Volatility Clustering - {selected_company}")
-        ax.set_xlabel("Date")
-        ax.set_ylabel("Log Returns")
-        plt.colorbar(scatter, label="Volatility Level")
-        
-        st.pyplot(fig)
+    
 
         #st.markdown("---")
 
