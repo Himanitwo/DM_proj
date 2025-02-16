@@ -228,7 +228,7 @@ if df is not None:
 
     import plotly.express as px
 
-    st.subheader("📊 Volume-Price Relationship (Bar Chart)")
+    st.subheader("Volume-Price Relationship (Bar Chart)")
 
     # Dropdown for selecting the number of years
     years = st.selectbox("Select number of years:", [3, 4, 5], index=2)  # Default is 5 years
@@ -345,13 +345,4 @@ if df is not None:
     print(f"📊 Overall Trend Direction: {trend}")
     print(f"📊 Breakout Alert: {breakout_alert}")
 
-
-    
-    #here
-    
-    
-
-        #st.markdown("---")
-
-        
 
