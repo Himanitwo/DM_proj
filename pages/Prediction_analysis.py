@@ -312,53 +312,6 @@ if df is not None:
     
     #here
     
-
-    # ---------------------------------------------------------------------
-    # Create a single area chart with the closing price, SMA, and manually calculated EMA
-    # ---------------------------------------------------------------------
-    fig = go.Figure()
-
-    # Closing Price as an area chart
-    fig.add_trace(go.Scatter(
-        x=df_year.index,
-        y=df_year['Close'],
-        mode='lines',
-        name='Close Price',
-        line=dict(color='blue'),
-        fill='tozeroy',
-        opacity=0.5
-    ))
-
-    # 20-Day SMA Line
-    fig.add_trace(go.Scatter(
-        x=df_year.index,
-        y=df_year['SMA_20'],
-        mode='lines',
-        name='50-Day SMA',
-        line=dict(color='green', width=2)
-    ))
-
-    # 20-Day EMA Line (Manual Calculation)
-    fig.add_trace(go.Scatter(
-        x=df_year.index,
-        y=df_year['EMA_20'],
-        mode='lines',
-        name='20-Day EMA',
-        line=dict(color='red', width=2)
-    ))
-
-    fig.update_layout(
-        title=f"20-Day SMA & EMA for {selected_company} in {selected_year}",
-        xaxis_title="Date",
-        yaxis_title="Price",
-        template="plotly_white"
-    )
-
-    st.plotly_chart(fig, use_container_width=True)
-
-    
-
-
     col_vol1,col_vol2=st.columns(2)
 # Layout: Yearly Performance & Best/Worst Stocks
     st.markdown("## 📊 Stock Market Dashboard")
