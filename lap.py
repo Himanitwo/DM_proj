@@ -135,3 +135,5 @@ if df is not None:
 
         st.markdown("---")
         st.markdown("💡 *Use filters to analyze different stocks and trends.*")
+
+
