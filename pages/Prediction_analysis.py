@@ -8,6 +8,7 @@ from prophet import Prophet
 import plotly.graph_objects as go
 import matplotlib.pyplot as plt
 import seaborn as sns
+import plotly.express as px
 
 # Set up the Streamlit page
 st.set_page_config(page_title="Stock Market Dashboard", layout="wide")
@@ -116,14 +117,7 @@ if df is not None:
             ))
             
             # Confidence interval
-            fig.add_trace(go.Scatter(
-                x=forecast["ds"].tolist() + forecast["ds"].tolist()[::-1],
-                y=forecast["yhat_upper"].tolist() + forecast["yhat_lower"].tolist()[::-1],
-                fill='toself',
-                fillcolor='rgba(255, 192, 203, 0.3)',
-                line=dict(color='rgba(255,255,255,0)'),
-                name='Confidence Interval'
-            ))
+
             
             # Layout
             fig.update_layout(
@@ -187,69 +181,86 @@ if df is not None:
     # -------------------------
     # K-Means Clustering for Risk Analysis (Filtered by Year)
     # -------------------------
-    selected_year_cluster = st.selectbox(
-        "Select Year for Clustering", 
-        sorted(df["Year"].dropna().unique(), reverse=True),
-        key="clustering_year"
-    )
-    df_year = df[df["Year"] == selected_year_cluster].copy()
-
-    # Create pivot table with average closing prices for the selected year
-    df_cluster = df_year.groupby(["Date", "Company"], as_index=False).agg({"Close": "mean"})
-    df_pivot = df_cluster.pivot(index='Date', columns='Company', values='Close')
-
-    # Compute daily percentage change, drop initial NaNs, and forward-fill
-    df_pivot = df_pivot.pct_change().dropna().fillna(method="ffill")
-
-    # Compute volatility for each company (std dev of daily % changes)
-    volatility = df_pivot.std()
-
-    # Standardize data for clustering
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(df_pivot.T)
-
-    # Run K-Means clustering
-    kmeans = KMeans(n_clusters=3, random_state=42, n_init=10)
-    cluster_labels = kmeans.fit_predict(X_scaled)
-
-    cluster_df = pd.DataFrame({'Company': df_pivot.columns, 'Cluster': cluster_labels})
-    cluster_df["X"] = X_scaled[:, 0]
-    cluster_df["Y"] = X_scaled[:, 1]
-
-    # Merge volatility into the clustering DataFrame
-    cluster_df["Volatility"] = cluster_df["Company"].map(volatility)
-
-    # For risk analysis, interpret higher volatility as higher risk.
-    cluster_risk = cluster_df.groupby("Cluster")["Volatility"].mean().reset_index()
-    cluster_risk = cluster_risk.sort_values("Volatility")
-    cluster_risk["Risk_Rank"] = range(1, len(cluster_risk) + 1)
-    risk_mapping = {1: "Low Risk", 2: "Moderate Risk", 3: "High Risk"}
-    cluster_risk["Risk_Level"] = cluster_risk["Risk_Rank"].map(risk_mapping)
-
-    cluster_df = cluster_df.merge(cluster_risk[["Cluster", "Risk_Level"]], on="Cluster", how="left")
-
-    col_cluster, col_cluster_details = st.columns((2, 1))
-    with col_cluster:
-        st.subheader("Stock Clusters Visualization (Filtered by Year)")
-        st.scatter_chart(cluster_df, x="X", y="Y", color="Cluster", use_container_width=True)
-    with col_cluster_details:
-        st.subheader("Cluster & Risk Details")
-        st.dataframe(cluster_df.sort_values(by="Cluster"))
-        company_cluster = cluster_df[cluster_df["Company"] == selected_company]
-        if not company_cluster.empty:
-            risk_level = company_cluster["Risk_Level"].values[0]
-            if risk_level == "Low Risk":
-                suggestion_risk = "This stock shows low volatility. It may be a stable investment."
-            elif risk_level == "Moderate Risk":
-                suggestion_risk = "This stock shows moderate volatility. Consider balancing with other assets."
-            else:
-                suggestion_risk = "This stock shows high volatility. Exercise caution and consider your risk tolerance."
-            st.info(f"**Risk Level for {selected_company}:** {risk_level}\n\n**Suggestion:** {suggestion_risk}")
+ 
     
+    st.subheader("K-Means Clustering for Trend Analysis")
+
+    # 1. Select a year for trend analysis from available years in the dataset.
+    selected_year_trend = st.selectbox(
+        "Select Year for Trend Analysis", 
+        sorted(df["Year"].dropna().unique(), reverse=True), 
+        key="trend_year"
+    )
+
+    # 2. Filter the data for the selected year.
+    df_trend_year = df[df["Year"] == selected_year_trend].copy()
+
+    # Ensure the Date column is in datetime format and sort the data by Date.
+    if not np.issubdtype(df_trend_year['Date'].dtype, np.datetime64):
+        df_trend_year['Date'] = pd.to_datetime(df_trend_year['Date'])
+    df_trend_year = df_trend_year.sort_values("Date")
+
+    # 3. For each company, calculate trend features:
+    #    - Cumulative Return: Overall return from the first to last closing price.
+    #    - Average Daily Return: Mean of daily percentage returns.
+    #    - Volatility: Standard deviation of daily percentage returns.
+    companies = df_trend_year["Company"].unique()
+    trend_features = []
+
+    for comp in companies:
+        comp_df = df_trend_year[df_trend_year["Company"] == comp].copy()
+        comp_df = comp_df.sort_values("Date")
+        if comp_df.empty:
+            continue
+        # Cumulative Return calculation
+        first_close = comp_df["Close"].iloc[0]
+        last_close = comp_df["Close"].iloc[-1]
+        cumulative_return = (last_close - first_close) / first_close
+        # Average Daily Return and Volatility calculation
+        daily_returns = comp_df["Close"].pct_change()
+        avg_daily_return = daily_returns.mean()
+        volatility = daily_returns.std()
+        
+        trend_features.append({
+            "Company": comp,
+            "Cumulative_Return": cumulative_return,
+            "Avg_Daily_Return": avg_daily_return,
+            "Volatility": volatility
+        })
+
+    trend_df = pd.DataFrame(trend_features)
+
+    # 4. Prepare the features for clustering.
+    # We'll use Cumulative Return, Average Daily Return, and Volatility.
+    features = trend_df[["Cumulative_Return", "Avg_Daily_Return", "Volatility"]].fillna(0)
+    scaler = StandardScaler()
+    features_scaled = scaler.fit_transform(features)
+
+    # 5. Run K-Means clustering (using 3 clusters, for example).
+    kmeans_trend = KMeans(n_clusters=3, random_state=42, n_init=10)
+    trend_clusters = kmeans_trend.fit_predict(features_scaled)
+    trend_df["Cluster"] = trend_clusters
+
+    # 6. Visualize the clusters.
+    # Here, we plot Cumulative Return (x-axis) vs. Volatility (y-axis), with color showing cluster membership.
+    fig = px.scatter(
+        trend_df, 
+        x="Cumulative_Return", 
+        y="Volatility", 
+        color="Cluster",
+        hover_data=["Company", "Avg_Daily_Return"],
+        title=f"Trend Analysis Clusters for {selected_year_trend}"
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    # 7. Display the trend features and cluster assignments.
+    st.subheader("Trend Features and Cluster Assignments")
+    st.dataframe(trend_df.sort_values("Cluster"))
+
     # -------------------------
     # Cumulative Returns Chart (Using st.line_chart)
     # -------------------------
-    # st.subheader("📈 Cumulative Returns")
+    # st.subheader("Cumulative Returns")
     df_selected = df[df["Company"] == selected_company].copy().sort_values("Date")
     df_selected.set_index("Date", inplace=True)
     df_selected["Daily_Return"] = df_selected["Close"].pct_change()
@@ -262,7 +273,7 @@ if df is not None:
 # Volume-Price Relationship Analysis (Dual-Axis Graph)
 # -------------------------
 
-    import plotly.express as px
+    
 
     st.subheader("Volume-Price Relationship (Bar Chart)")
 
@@ -341,7 +352,7 @@ if df is not None:
             - May signal a weak downtrend or a possible reversal  
             """
         )
-    st.subheader("Trend indicators🔍")
+    st.subheader("Trend indicators")
     df["SMA_20"] = df["Close"].rolling(window=20).mean()
 
 # 2️⃣ **Calculate Price Change (%) Over the Last 30 Days**
@@ -358,7 +369,7 @@ if df is not None:
     else:
         trend = "Sideways"
 
-    # 4️⃣ **Breakout Alert: If Price Moves Significantly Above/Below SMA**
+    #  **Breakout Alert: If Price Moves Significantly Above/Below SMA**
     if latest_price > latest_sma * 1.05:  # If price is 5% above SMA
         breakout_alert = "Strong Uptrend (Breakout Above SMA)"
     elif latest_price < latest_sma * 0.95:  # If price is 5% below SMA

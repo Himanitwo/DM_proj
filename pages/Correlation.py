@@ -44,7 +44,7 @@ else:
         st.dataframe(merged_df[[company1, company2]].corr())
         
         # Dropdown for graph selection
-        graph_type = st.sidebar.selectbox("Select Graph Type", ["Scatter Plot", "Line Chart", "Heatmap"])
+        graph_type = st.sidebar.selectbox("Select Graph Type", ["Scatter Plot", "Line Chart"])
         
         # Generate selected graph
         if graph_type == "Scatter Plot":
@@ -58,9 +58,5 @@ else:
         elif graph_type == "Line Chart":
             st.line_chart(merged_df.set_index("Date"))
         
-        elif graph_type == "Heatmap":
-            fig, ax = plt.subplots()
-            sns.heatmap(merged_df[[company1, company2]].corr(), annot=True, cmap="coolwarm", ax=ax)
-            st.pyplot(fig)
     else:
         st.warning("Please select two different companies for correlation analysis.")
