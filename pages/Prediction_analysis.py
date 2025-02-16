@@ -311,32 +311,7 @@ if df is not None:
 
     
     #here
-    st.subheader("📊 SMA, EMA (Manual Calculation), and Volatility (Single Chart)")
-
-    # Dropdown for year selection
-    available_years = sorted(df_selected["Year"].unique(), reverse=True)
-    selected_year = st.selectbox("Select Year:", available_years, index=0)
-
-    # Filter data for the selected year (assumes df_selected has a "Year" column)
-    df_year = df_selected[df_selected["Year"] == selected_year].copy()
-
-    # Ensure the index is a DatetimeIndex
-    if not isinstance(df_year.index, pd.DatetimeIndex):
-        df_year["Date"] = pd.to_datetime(df_year["Date"])
-        df_year.set_index("Date", inplace=True)
-
-    # Calculate 20-day SMA for the closing price
-    df_year['SMA_20'] = df_year['Close'].rolling(window=50).mean()
-
-    # Define a function to calculate the 20-day EMA manually using the given formula
     
-    # Calculate 20-day EMA using our manual function
-    df_year['EMA_20'] =  df_year['Close'].rolling(window=20).mean()
-
-
-    # Calculate volatility (standard deviation of daily returns in percentage)
-    df_year['Daily_Return'] = df_year['Close'].pct_change()
-    volatility = df_year['Daily_Return'].std() * 100  # expressed as a percentage
 
     # ---------------------------------------------------------------------
     # Create a single area chart with the closing price, SMA, and manually calculated EMA
