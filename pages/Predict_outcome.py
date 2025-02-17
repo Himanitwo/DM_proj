@@ -1,12 +1,113 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 from sklearn.linear_model import LinearRegression
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
+from prophet import Prophet
+import plotly.graph_objects as go
+import matplotlib.pyplot as plt
+import seaborn as sns
+import plotly.express as px
 
 # Load dataset
 data_path = "./sorce.csv"
 df = pd.read_csv(data_path)
+col_forecast, col_prices = st.columns(2)
+@st.cache_data
+def load_data():
+    file_path = "sorce.csv"
+    df = pd.read_csv(file_path)
+    df.columns = df.columns.str.strip()  
+    
+    if "Date" in df.columns:
+        df["Date"] = pd.to_datetime(df["Date"])
+    else:
+        st.error("❌ 'Date' column not found in dataset.")
+        return None
+    
+    # Ensure required columns are present (needed for various analyses)
+    required_columns = {"Company", "Close", "Volume", "Open", "High", "Low"}
+    if not required_columns.issubset(df.columns):
+        st.error(f"❌ Missing columns: {required_columns - set(df.columns)}")
+        return None
+    
+    # Handle duplicate entries by aggregating numeric values (averaging prices, summing volume)
+    df = df.groupby(["Date", "Company"], as_index=False).agg({
+        "Open": "mean",
+        "High": "mean",
+        "Low": "mean",
+        "Close": "mean",
+        "Volume": "sum"
+    })
+    df["Total_Trade_Value"] = df["Close"] * df["Volume"]
+    df["Year"] = df["Date"].dt.year
+    return df
 
+df = load_data()
+if df is not None:
+    st.sidebar.header("Dashboard Filters")
+    selected_company = st.sidebar.selectbox("🔍 Select a Company", df["Company"].unique())
+
+    # -------------------------
+    # Forecasting & Latest Price
+    # -------------------------
+    col_forecast, col_prices = st.columns(2)
+    
+    with col_forecast:
+        company_data = df[df["Company"] == selected_company][["Date", "Close"]].rename(columns={"Date": "ds", "Close": "y"})
+
+        if len(company_data) > 0:
+            model = Prophet()
+            model.fit(company_data)
+            
+            future = model.make_future_dataframe(periods=365)
+            forecast = model.predict(future)
+            
+            # Create figure
+            fig = go.Figure()
+            
+            # Actual data
+            fig.add_trace(go.Scatter(
+                x=company_data["ds"], 
+                y=company_data["y"], 
+                mode='lines', 
+                name='Actual Data',
+                line=dict(color='blue')
+            ))
+            
+            # Predicted data
+            fig.add_trace(go.Scatter(
+                x=forecast["ds"], 
+                y=forecast["yhat"], 
+                mode='lines', 
+                name='Predicted Data',
+                line=dict(color='red')
+            ))
+            
+            # Confidence interval
+
+            
+            # Layout
+            fig.update_layout(
+                title=f"Stock Price Forecast - {selected_company}",
+                xaxis_title='Date',
+                yaxis_title='Stock Price ($)',
+                template='plotly_white'
+            )
+            
+            # Display plot in Streamlit
+            st.plotly_chart(fig)
+
+    
+    with col_prices:
+        latest_data_all = df.groupby("Company").last()
+        trade_price_table = latest_data_all[["Close"]].rename(columns={"Close": "Last Trade Price"})
+        st.subheader("Latest Trade Prices")
+        st.dataframe(trade_price_table, use_container_width=True)
 # Ensure column names are correct
+data_path = "./sorce.csv"
+df = pd.read_csv(data_path)
 df.columns = df.columns.str.strip()
 if "Company" not in df.columns:
     st.error("Error: 'Company' column is missing from the dataset.")
