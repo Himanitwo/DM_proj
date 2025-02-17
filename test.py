@@ -9,11 +9,8 @@ import plotly.graph_objects as go
 import matplotlib.pyplot as plt
 import seaborn as sns
 import plotly.express as px
-
-
-import matplotlib.pyplot as plt
-
 from sklearn.metrics import silhouette_score
+
 # Set up the Streamlit page
 st.set_page_config(page_title="Stock Market Dashboard", layout="wide")
 
@@ -87,13 +84,62 @@ if df is not None:
     # -------------------------
     # Forecasting & Latest Price
     # -------------------------
+    col_forecast, col_prices = st.columns(2)
+    
+    with col_forecast:
+        company_data = df[df["Company"] == selected_company][["Date", "Close"]].rename(columns={"Date": "ds", "Close": "y"})
+
+        if len(company_data) > 0:
+            model = Prophet()
+            model.fit(company_data)
+            
+            future = model.make_future_dataframe(periods=365)
+            forecast = model.predict(future)
+            
+            # Create figure
+            fig = go.Figure()
+            
+            # Actual data
+            fig.add_trace(go.Scatter(
+                x=company_data["ds"], 
+                y=company_data["y"], 
+                mode='lines', 
+                name='Actual Data',
+                line=dict(color='blue')
+            ))
+            
+            # Predicted data
+            fig.add_trace(go.Scatter(
+                x=forecast["ds"], 
+                y=forecast["yhat"], 
+                mode='lines', 
+                name='Predicted Data',
+                line=dict(color='red')
+            ))
+            
+            # Layout
+            fig.update_layout(
+                title=f"Stock Price Forecast - {selected_company}",
+                xaxis_title='Date',
+                yaxis_title='Stock Price ($)',
+                template='plotly_white'
+            )
+            
+            # Display plot in Streamlit
+            st.plotly_chart(fig)
+    
+    with col_prices:
+        latest_data_all = df.groupby("Company").last()
+        trade_price_table = latest_data_all[["Close"]].rename(columns={"Close": "Last Trade Price"})
+        st.subheader("Latest Trade Prices")
+        st.dataframe(trade_price_table, use_container_width=True)
     
     # -------------------------
     # Trend Analysis with Linear Regression & Suggestion Box
     # -------------------------
     selected_year = st.selectbox("Select Year for Trend Analysis", sorted(df["Year"].dropna().unique(), reverse=True))
     df_filtered = df[(df["Company"] == selected_company) & (df["Year"] == selected_year)].copy()
-    col_gr,col_tab=st.columns(2)
+    col_gr, col_tab = st.columns(2)
     with col_gr:
         if df_filtered.empty:
             st.warning(f"No data available for {selected_company} in {selected_year}")
@@ -107,7 +153,6 @@ if df is not None:
             lr_model = LinearRegression()
             lr_model.fit(X, y)
             df_filtered['Trend'] = lr_model.predict(X)
-            # Use st.line_chart for an interactive trend graph.
             st.subheader(f"Stock Price Trends - {selected_company} ({selected_year})")
             trend_chart_data = df_filtered.set_index("Date")[["Close", "7-day MA", "30-day MA", "Trend"]]
             st.line_chart(trend_chart_data)
@@ -127,23 +172,20 @@ if df is not None:
         st.subheader("Trend Analysis & Suggestion")
         st.info(f"**Trend:** {trend_label}\n\n**Suggestion:** {suggestion_trend}")
         
-        
-    
     # -------------------------
-    # K-Means Clustering for Risk Analysis (Filtered by Year)
+    # K-Means Clustering for Trend Analysis (Filtered by Year)
     # -------------------------
- 
     
     st.subheader("K-Means Clustering for Trend Analysis")
 
-    #  Selecting theyear for trend analysis from avai years in the dataset.
+    # 1. Select a year for trend analysis from available years in the dataset.
     selected_year_trend = st.selectbox(
-        "Select Year for Trend Analysis", 
+        "Select Year for Trend Analysis (Clustering)", 
         sorted(df["Year"].dropna().unique(), reverse=True), 
         key="trend_year"
     )
 
-    # Filter n take data for the selected year.
+    # 2. Filter the data for the selected year.
     df_trend_year = df[df["Year"] == selected_year_trend].copy()
 
     # Ensure the Date column is in datetime format and sort the data by Date.
@@ -151,11 +193,10 @@ if df is not None:
         df_trend_year['Date'] = pd.to_datetime(df_trend_year['Date'])
     df_trend_year = df_trend_year.sort_values("Date")
 
-    '''calclulate For each company trend features:
+    # 3. For each company, calculate trend features:
     #    - Cumulative Return: Overall return from the first to last closing price.
-    #    - Avg Daily Return: Mean of daily percentage returns.
-    #    - Volatility: Standard deviation of daily percentage returns.'''
-
+    #    - Average Daily Return: Mean of daily percentage returns.
+    #    - Volatility: Standard deviation of daily percentage returns.
     companies = df_trend_year["Company"].unique()
     trend_features = []
 
@@ -182,20 +223,18 @@ if df is not None:
 
     trend_df = pd.DataFrame(trend_features)
 
-    '''features for clustering.'''
-    #  Cumulative Return, Average Daily Return, and Volatility.
+    # 4. Prepare the features for clustering.
     features = trend_df[["Cumulative_Return", "Avg_Daily_Return", "Volatility"]].fillna(0)
     scaler = StandardScaler()
     features_scaled = scaler.fit_transform(features)
 
-    '''Run K-Means clustering '''
+    # 5. Run K-Means clustering (using 3 clusters, for example).
     kmeans_trend = KMeans(n_clusters=3, random_state=42, n_init=10)
     trend_clusters = kmeans_trend.fit_predict(features_scaled)
     trend_df["Cluster"] = trend_clusters
 
-    # 
-    #  plot Cumulative Return (x-axis) and Volatility (y-axis).
-    fig = px.scatter(
+    # 6. Visualize the clusters.
+    fig_clusters = px.scatter(
         trend_df, 
         x="Cumulative_Return", 
         y="Volatility", 
@@ -203,40 +242,85 @@ if df is not None:
         hover_data=["Company", "Avg_Daily_Return"],
         title=f"Trend Analysis Clusters for {selected_year_trend}"
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig_clusters, use_container_width=True)
 
-    # Displaying the trend features and cluster assignments.
+    # 7. Display the trend features and cluster assignments.
     st.subheader("Trend Features and Cluster Assignments")
     st.dataframe(trend_df.sort_values("Cluster"))
+    print(features_scaled.shape)  # (n_samples, n_features)
+
+
+    # ------------------------------
+    # Elbow Method to Evaluate Inertia (for clustering)
+    # ------------------------------
+    st.subheader("Elbow Method to Determine Optimal Clusters")
+
+    inertia = []
+    k_range = range(1, 11)  # Testing k from 1 to 10 clusters
+
+    for k in k_range:
+        kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
+        kmeans.fit(features_scaled)
+        inertia.append(kmeans.inertia_)  # Inertia: sum of squared distances
+
+    # Plot the inertia to visually find the "elbow"
+    fig_elbow, ax_elbow = plt.subplots(figsize=(8, 5))
+    ax_elbow.plot(list(k_range), inertia, marker='o', linestyle='-')
+    ax_elbow.set_xlabel('Number of Clusters (k)')
+    ax_elbow.set_ylabel('Inertia (Sum of Squared Distances)')
+    ax_elbow.set_title('Elbow Method for Optimal k')
+    ax_elbow.set_xticks(list(k_range))
+    st.pyplot(fig_elbow)
+
+    # Automatic Elbow Detection
+    # Define first and last points on the inertia plot
+    point1 = np.array([1, inertia[0]])
+    point2 = np.array([10, inertia[-1]])
+
+    def distance_from_line(point, line_start, line_end):
+        # Calculate perpendicular distance from a point to the line
+        numerator = np.abs(
+            (line_end[1] - line_start[1]) * point[0] -
+            (line_end[0] - line_start[0]) * point[1] +
+            line_end[0] * line_start[1] -
+            line_end[1] * line_start[0]
+        )
+        denominator = np.sqrt((line_end[1] - line_start[1])**2 + (line_end[0] - line_start[0])**2)
+        return numerator / denominator
+
+    distances = []
+    for i, k in enumerate(k_range):
+        point = np.array([k, inertia[i]])
+        distances.append(distance_from_line(point, point1, point2))
+
+    elbow_k = list(k_range)[np.argmax(distances)]
+    st.write(f"**Estimated Optimal Number of Clusters (Elbow Point): {elbow_k}**")
+
     # -------------------------
-    # Cumulative Returns Chart
+    # Cumulative Returns Chart (Using st.line_chart)
     # -------------------------
-    # st.subheader("Cumulative Returns")
-    
-    
-
-    # st.line_chart(df_selected["Cumulative_Return"])
-
-# -------------------------
-# Volume-Price Relationship Analysis (Dual-Axis Graph)
-# -------------------------
-
-    
-
-    st.subheader("Volume-Price Relationship (Bar Chart)")
-
-    # Dropdown for the number of years
-    years = st.selectbox("Select number of years:", [3, 4, 5], index=2)  # Default is 5 years
     df_selected = df[df["Company"] == selected_company].copy().sort_values("Date")
     df_selected.set_index("Date", inplace=True)
-    # Filter data based on selected years (note:assume df_selected has a DatetimeIndex)
-    df_filtered = df_selected[df_selected.index >= pd.Timestamp.today() - pd.DateOffset(years=years)].copy()
+    df_selected["Daily_Return"] = df_selected["Close"].pct_change()
+    # Calculate cumulative returns; starting from a base value of 100
+    df_selected["Cumulative_Return"] = (1 + df_selected["Daily_Return"]).cumprod() * 100
+    # st.line_chart(df_selected["Cumulative_Return"])
 
-    # Calculate daily price change and 20-day ma for volume
-    df_filtered['Price_Change'] = df_filtered['Close'].diff()
-    df_filtered['Volume_MA20'] = df_filtered['Volume'].rolling(window=20).mean()
+    # -------------------------
+    # Volume-Price Relationship Analysis (Dual-Axis Graph)
+    # -------------------------
+    st.subheader("Volume-Price Relationship (Bar Chart)")
 
-    # function to classify each day based on price change and volume
+    # Dropdown for selecting the number of years
+    years = st.selectbox("Select number of years:", [3, 4, 5], index=2)  # Default is 5 years
+
+    # Filter data based on selected years (assumes df_selected has a DatetimeIndex)
+    df_filtered_vol = df_selected[df_selected.index >= pd.Timestamp.today() - pd.DateOffset(years=years)].copy()
+
+    # Calculate daily price change and 20-day moving average for volume
+    df_filtered_vol['Price_Change'] = df_filtered_vol['Close'].diff()
+    df_filtered_vol['Volume_MA20'] = df_filtered_vol['Volume'].rolling(window=20).mean()
+
     def classify_day(row):
         if pd.isna(row['Volume_MA20']):
             return np.nan  # Not enough data to classify
@@ -251,11 +335,9 @@ if df is not None:
         else:
             return 'No Change'
 
-    # put classification
-    df_filtered['Trend'] = df_filtered.apply(classify_day, axis=1)
-    df_filtered = df_filtered.dropna(subset=['Trend'])
+    df_filtered_vol['Trend'] = df_filtered_vol.apply(classify_day, axis=1)
+    df_filtered_vol = df_filtered_vol.dropna(subset=['Trend'])
 
-    # color mapping for the classifications
     color_map = {
         'High Volume Up': 'green',
         'Low Volume Up': 'lightgreen',
@@ -263,10 +345,9 @@ if df is not None:
         'Low Volume Down': 'orange'
     }
 
-    #  bar chart by Plotly Exp
-    fig = px.bar(
-        df_filtered,
-        x=df_filtered.index,
+    fig_vol = px.bar(
+        df_filtered_vol,
+        x=df_filtered_vol.index,
         y="Volume",
         color="Trend",
         color_discrete_map=color_map,
@@ -274,12 +355,9 @@ if df is not None:
         labels={'Volume': 'Trading Volume', 'Trend': 'Market Trend'}
     )
 
-    #  two columns
-    col1, col2 = st.columns([3, 1])  # Wider column for the graph
-
+    col1, col2 = st.columns([3, 1])
     with col1:
-        st.plotly_chart(fig, use_container_width=True)
-
+        st.plotly_chart(fig_vol, use_container_width=True)
     with col2:
         st.subheader("Insights")
         st.markdown(
@@ -301,38 +379,40 @@ if df is not None:
             - May signal a weak downtrend or a possible reversal  
             """
         )
+
     st.subheader("Trend indicators")
     df["SMA_20"] = df["Close"].rolling(window=20).mean()
 
-# Calculate Price Change Over the Last 30 Days
+    # Calculate Price Change (%) Over the Last 30 Days
     df["Price Change (%)"] = (df["Close"] - df["Close"].shift(30)) / df["Close"].shift(30) * 100
 
-    '''Overall Trend Direction'''
+    # Determine Overall Trend Direction
+    latest_sma = df["SMA_20"].iloc[-1]
+    latest_price = df["Close"].iloc[-1]
 
-    latest_sma = df["SMA_20"].iloc[-1]  # Most recent SMA value
-    latest_price = df["Close"].iloc[-1]  # Most recent closing price
-
-    if latest_price > latest_sma * 1.02:  # If price is 2% above SMA
+    if latest_price > latest_sma * 1.02:
         trend = "📈 Upward"
-    elif latest_price < latest_sma * 0.98:  # If price is 2% below SMA
+    elif latest_price < latest_sma * 0.98:
         trend = "📉 Downward"
     else:
         trend = "Sideways"
 
-    '''Breakout Alert: If Price Moves Significantly Above/Below SMA'''
-
-    if latest_price > latest_sma * 1.05:  # If price is 5% above SMA
+    if latest_price > latest_sma * 1.05:
         breakout_alert = "Strong Uptrend (Breakout Above SMA)"
-    elif latest_price < latest_sma * 0.95:  # If price is 5% below SMA
+    elif latest_price < latest_sma * 0.95:
         breakout_alert = "Potential Downtrend (Breakout Below SMA)"
     else:
         breakout_alert = "No Significant Breakout"
 
-
     trend_data = {
-    "Metric": ["20-Day SMA", "Price Change (%)", "Overall Trend", "Breakout Alert"],
-    "Value": [f"{latest_sma:.2f}", f"{df['Price Change (%)'].iloc[-1]:.2f}%", trend, breakout_alert]
+        "Metric": ["20-Day SMA", "Price Change (%)", "Overall Trend", "Breakout Alert"],
+        "Value": [f"{latest_sma:.2f}", f"{df['Price Change (%)'].iloc[-1]:.2f}%", trend, breakout_alert]
     }
+    trend_df_summary = pd.DataFrame(trend_data)
+    st.table(trend_df_summary)
 
-    trend_df = pd.DataFrame(trend_data)
-    st.table(trend_df)
+    # Display Key Metrics in Console (for debugging)
+    print(f"20-Day Moving Average (SMA): {latest_sma:.2f}")
+    print(f"Price Change (Last 30 Days): {df['Price Change (%)'].iloc[-1]:.2f}%")
+    print(f"Overall Trend Direction: {trend}")
+    print(f"Breakout Alert: {breakout_alert}")
