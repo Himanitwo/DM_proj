@@ -82,60 +82,7 @@ if df is not None:
 
     # -------------------------
     # Forecasting & Latest Price
-    # -------------------------
-    col_forecast, col_prices = st.columns(2)
-    
-    with col_forecast:
-        company_data = df[df["Company"] == selected_company][["Date", "Close"]].rename(columns={"Date": "ds", "Close": "y"})
-
-        if len(company_data) > 0:
-            model = Prophet()
-            model.fit(company_data)
-            
-            future = model.make_future_dataframe(periods=365)
-            forecast = model.predict(future)
-            
-            # Create figure
-            fig = go.Figure()
-            
-            # Actual data
-            fig.add_trace(go.Scatter(
-                x=company_data["ds"], 
-                y=company_data["y"], 
-                mode='lines', 
-                name='Actual Data',
-                line=dict(color='blue')
-            ))
-            
-            # Predicted data
-            fig.add_trace(go.Scatter(
-                x=forecast["ds"], 
-                y=forecast["yhat"], 
-                mode='lines', 
-                name='Predicted Data',
-                line=dict(color='red')
-            ))
-            
-            # Confidence interval
-
-            
-            # Layout
-            fig.update_layout(
-                title=f"Stock Price Forecast - {selected_company}",
-                xaxis_title='Date',
-                yaxis_title='Stock Price ($)',
-                template='plotly_white'
-            )
-            
-            # Display plot in Streamlit
-            st.plotly_chart(fig)
-
-    
-    with col_prices:
-        latest_data_all = df.groupby("Company").last()
-        trade_price_table = latest_data_all[["Close"]].rename(columns={"Close": "Last Trade Price"})
-        st.subheader("Latest Trade Prices")
-        st.dataframe(trade_price_table, use_container_width=True)
+    # -------------------------)
     
     # -------------------------
     # Trend Analysis with Linear Regression & Suggestion Box
