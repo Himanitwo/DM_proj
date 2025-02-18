@@ -25,28 +25,28 @@ else:
     company2 = st.sidebar.selectbox("Select Second Company", companies)
     
     if company1 != company2:
-        # Sidebar dropdown for year selection
+        
         selected_year = st.sidebar.selectbox("Select Year", sorted(df["Year"].unique(), reverse=True))
         df = df[df["Year"] == selected_year]
         
-        # Filter data for selected companies
+        
         df1 = df[df["Company"] == company1][["Date", "Close"]].rename(columns={"Close": company1})
         df2 = df[df["Company"] == company2][["Date", "Close"]].rename(columns={"Close": company2})
         
-        # Merge data on Date
+        
         merged_df = pd.merge(df1, df2, on="Date", how="inner")
         
-        # Compute Pearson Correlation
+       
         correlation = merged_df[[company1, company2]].corr().iloc[0, 1]
         st.metric(label="Pearson Correlation", value=f"{correlation:.2f}")
         
-        # Display Correlation Dataframe
+       
         st.dataframe(merged_df[[company1, company2]].corr())
         
-        # Dropdown for graph selection
+        
         graph_type = st.sidebar.selectbox("Select Graph Type", ["Scatter Plot", "Line Chart"])
         
-        # Generate selected graph
+        
         if graph_type == "Scatter Plot":
             fig, ax = plt.subplots()
             sns.scatterplot(x=merged_df[company1], y=merged_df[company2], ax=ax)
