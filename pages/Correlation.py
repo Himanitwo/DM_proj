@@ -3,11 +3,10 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-# Load dataset
+
 data_path = "./sorce.csv"
 df = pd.read_csv(data_path)
 
-# Ensure column names are correct
 df.columns = df.columns.str.strip()
 if "Company" not in df.columns or "Close" not in df.columns or "Date" not in df.columns:
     st.error("Error: Required columns are missing from the dataset.")
@@ -15,11 +14,11 @@ else:
     st.title("Competitor Stock Correlation Analysis")
     st.sidebar.header("Select Companies")
     
-    # Convert Date column to datetime
+    
     df["Date"] = pd.to_datetime(df["Date"])
     df["Year"] = df["Date"].dt.year
     
-    # Get unique companies
+    
     companies = df["Company"].unique()
     company1 = st.sidebar.selectbox("Select First Company", companies)
     company2 = st.sidebar.selectbox("Select Second Company", companies)

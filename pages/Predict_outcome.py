@@ -62,10 +62,10 @@ if df is not None:
             future = model.make_future_dataframe(periods=365)
             forecast = model.predict(future)
             
-            # Create figure
+            
             fig = go.Figure()
             
-            # Actual data
+           
             fig.add_trace(go.Scatter(
                 x=company_data["ds"], 
                 y=company_data["y"], 
@@ -83,10 +83,7 @@ if df is not None:
                 line=dict(color='red')
             ))
             
-            # Confidence interval
-
             
-            # Layout
             fig.update_layout(
                 title=f"Stock Price Forecast - {selected_company}",
                 xaxis_title='Date',
@@ -94,7 +91,7 @@ if df is not None:
                 template='plotly_white'
             )
             
-            # Display plot in Streamlit
+           
             st.plotly_chart(fig)
 
     
@@ -121,14 +118,14 @@ else:
         model.fit(X, y)
         return model
 
-    # Train Model
+    
     model = train_regression_model(df)
 
-    # Streamlit UI
+    
     st.title("Stock Price Prediction with Linear Regression")
     st.header("User Input")
 
-    # User Inputs
+    
     col1,col2,col3=st.columns(3)
     with col1:
      company = st.selectbox("Select Company", companies)
@@ -139,11 +136,11 @@ else:
     with col3:
         volume = st.number_input("Volume", min_value=0, value=1000000)
 
-    # Prepare input data
+    
     input_data = pd.DataFrame([[open_price, high_price, low_price, volume]], 
                                columns=["Open", "High", "Low", "Volume"])
 
-    # Prediction
+    
     if st.button("Predict"):
         prediction = model.predict(input_data)[0]
         st.write(f"### Predicted Close Price: {prediction:.2f}")

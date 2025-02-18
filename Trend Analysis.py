@@ -14,7 +14,7 @@ import plotly.express as px
 import matplotlib.pyplot as plt
 
 from sklearn.metrics import silhouette_score
-# Set up the Streamlit page
+
 st.set_page_config(page_title="Stock Market Dashboard", layout="wide")
 
 @st.cache_data
@@ -29,13 +29,13 @@ def load_data():
         st.error("❌ 'Date' column not found in dataset.")
         return None
     
-    # Ensure required columns are present (needed for various analyses)
+    
     required_columns = {"Company", "Close", "Volume", "Open", "High", "Low"}
     if not required_columns.issubset(df.columns):
         st.error(f"❌ Missing columns: {required_columns - set(df.columns)}")
         return None
     
-    # Handle duplicate entries by aggregating numeric values (averaging prices, summing volume)
+
     df = df.groupby(["Date", "Company"], as_index=False).agg({
         "Open": "mean",
         "High": "mean",
@@ -50,7 +50,7 @@ def load_data():
 df = load_data()
 
 def calculate_rsi(series, window=14):
-    """Calculate Relative Strength Index (RSI) for a given series."""
+    
     delta = series.diff()
     gain = delta.clip(lower=0).rolling(window=window, min_periods=1).mean()
     loss = -delta.clip(upper=0).rolling(window=window, min_periods=1).mean()
@@ -60,18 +60,18 @@ def calculate_rsi(series, window=14):
 
 @st.cache_data
 def compute_technical_indicators(df):
-    """Compute technical indicators (RSI and Volatility) for each company."""
+    
     companies = df["Company"].unique()
     tech_list = []
     
     for comp in companies:
         df_comp = df[df["Company"] == comp].copy().sort_values("Date")
-        # Calculate RSI on closing prices
+        
         df_comp["RSI"] = calculate_rsi(df_comp["Close"])
-        # Use the most recent RSI value (or an average over a recent period)
+        
         latest_rsi = df_comp["RSI"].iloc[-1]
         
-        # Compute daily percentage change and volatility (std dev of % changes)
+        
         df_comp["Pct_Change"] = df_comp["Close"].pct_change()
         volatility = df_comp["Pct_Change"].std()
         
@@ -109,7 +109,7 @@ if df is not None:
             trend_chart_data = df_filtered.set_index("Date")[["Close", "7-day MA", "30-day MA", "Trend"]]
             st.line_chart(trend_chart_data)
     with col_tab:
-        # '''Determine trend based on slope'''
+      
         slope = lr_model.coef_[0]
         if slope > 0:
             trend_label = "📈 Uptrend"
@@ -133,14 +133,14 @@ if df is not None:
     
     st.subheader("K-Means Clustering for Trend Analysis")
 
-    #  Selecting theyear for trend analysis from avai years in the dataset.
+    
     selected_year_trend = st.selectbox(
         "Select Year for Trend Analysis", 
         sorted(df["Year"].dropna().unique(), reverse=True), 
         key="trend_year"
     )
 
-    # Filter n take data for the selected year.
+   
     df_trend_year = df[df["Year"] == selected_year_trend].copy()
 
     # Ensure the Date column is in datetime format and sort the data by Date.
@@ -161,11 +161,11 @@ if df is not None:
         comp_df = comp_df.sort_values("Date")
         if comp_df.empty:
             continue
-        # Cumulative Return calculation
+        
         first_close = comp_df["Close"].iloc[0]
         last_close = comp_df["Close"].iloc[-1]
         cumulative_return = (last_close - first_close) / first_close
-        # Average Daily Return and Volatility calculation
+        
         daily_returns = comp_df["Close"].pct_change()
         avg_daily_return = daily_returns.mean()
         volatility = daily_returns.std()
@@ -179,19 +179,17 @@ if df is not None:
 
     trend_df = pd.DataFrame(trend_features)
 
-    # '''features for clustering.'''
-    #  Cumulative Return, Average Daily Return, and Volatility.
+ 
     features = trend_df[["Cumulative_Return", "Avg_Daily_Return", "Volatility"]].fillna(0)
     scaler = StandardScaler()
     features_scaled = scaler.fit_transform(features)
 
-    # '''Run K-Means clustering '''
+
     kmeans_trend = KMeans(n_clusters=3, random_state=42, n_init=10)
     trend_clusters = kmeans_trend.fit_predict(features_scaled)
     trend_df["Cluster"] = trend_clusters
 
-    # 
-    #  plot Cumulative Return (x-axis) and Volatility (y-axis).
+  
     fig = px.scatter(
         trend_df, 
         x="Cumulative_Return", 
@@ -202,7 +200,7 @@ if df is not None:
     )
     st.plotly_chart(fig, use_container_width=True)
 
-    # Displaying the trend features and cluster assignments.
+    
     st.subheader("Trend Features and Cluster Assignments")
     st.dataframe(trend_df.sort_values("Cluster"))
     # -------------------------
@@ -248,11 +246,11 @@ if df is not None:
         else:
             return 'No Change'
 
-    # put classification
+    
     df_filtered['Trend'] = df_filtered.apply(classify_day, axis=1)
     df_filtered = df_filtered.dropna(subset=['Trend'])
 
-    # color mapping for the classifications
+   
     color_map = {
         'High Volume Up': 'green',
         'Low Volume Up': 'lightgreen',
@@ -260,7 +258,7 @@ if df is not None:
         'Low Volume Down': 'orange'
     }
 
-    #  bar chart by Plotly Exp
+   
     fig = px.bar(
         df_filtered,
         x=df_filtered.index,
@@ -271,8 +269,8 @@ if df is not None:
         labels={'Volume': 'Trading Volume', 'Trend': 'Market Trend'}
     )
 
-    #  two columns
-    col1, col2 = st.columns([3, 1])  # Wider column for the graph
+   
+    col1, col2 = st.columns([3, 1])  
 
     with col1:
         st.plotly_chart(fig, use_container_width=True)
@@ -301,22 +299,22 @@ if df is not None:
     st.subheader("Trend indicators")
     df["SMA_20"] = df["Close"].rolling(window=20).mean()
 
-# Calculate Price Change Over the Last 30 Days
+
     df["Price Change (%)"] = (df["Close"] - df["Close"].shift(30)) / df["Close"].shift(30) * 100
 
-    '''Overall Trend Direction'''
+    
 
-    latest_sma = df["SMA_20"].iloc[-1]  # Most recent SMA value
-    latest_price = df["Close"].iloc[-1]  # Most recent closing price
+    latest_sma = df["SMA_20"].iloc[-1]  
+    latest_price = df["Close"].iloc[-1]  
 
-    if latest_price > latest_sma * 1.02:  # If price is 2% above SMA
+    if latest_price > latest_sma * 1.02: 
         trend = "📈 Upward"
-    elif latest_price < latest_sma * 0.98:  # If price is 2% below SMA
+    elif latest_price < latest_sma * 0.98:  
         trend = "📉 Downward"
     else:
         trend = "Sideways"
 
-    # '''Breakout Alert: If Price Moves Significantly Above/Below SMA'''
+  
 
     if latest_price > latest_sma * 1.05:  # If price is 5%(test) above SMA
         breakout_alert = "Strong Uptrend (Breakout Above SMA)"
