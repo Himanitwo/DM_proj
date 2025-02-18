@@ -84,9 +84,6 @@ if df is not None:
     st.sidebar.header("Dashboard Filters")
     selected_company = st.sidebar.selectbox("🔍 Select a Company", df["Company"].unique())
 
-    # -------------------------
-    # Forecasting & Latest Price
-    # -------------------------
     
     # -------------------------
     # Trend Analysis with Linear Regression & Suggestion Box
@@ -112,7 +109,7 @@ if df is not None:
             trend_chart_data = df_filtered.set_index("Date")[["Close", "7-day MA", "30-day MA", "Trend"]]
             st.line_chart(trend_chart_data)
     with col_tab:
-        '''Determine trend based on slope'''
+        # '''Determine trend based on slope'''
         slope = lr_model.coef_[0]
         if slope > 0:
             trend_label = "📈 Uptrend"
@@ -151,7 +148,7 @@ if df is not None:
         df_trend_year['Date'] = pd.to_datetime(df_trend_year['Date'])
     df_trend_year = df_trend_year.sort_values("Date")
 
-    '''calclulate For each company trend features:
+    # calclulate For each company trend features:
     #    - Cumulative Return: Overall return from the first to last closing price.
     #    - Avg Daily Return: Mean of daily percentage returns.
     #    - Volatility: Standard deviation of daily percentage returns.'''
@@ -182,13 +179,13 @@ if df is not None:
 
     trend_df = pd.DataFrame(trend_features)
 
-    '''features for clustering.'''
+    # '''features for clustering.'''
     #  Cumulative Return, Average Daily Return, and Volatility.
     features = trend_df[["Cumulative_Return", "Avg_Daily_Return", "Volatility"]].fillna(0)
     scaler = StandardScaler()
     features_scaled = scaler.fit_transform(features)
 
-    '''Run K-Means clustering '''
+    # '''Run K-Means clustering '''
     kmeans_trend = KMeans(n_clusters=3, random_state=42, n_init=10)
     trend_clusters = kmeans_trend.fit_predict(features_scaled)
     trend_df["Cluster"] = trend_clusters
@@ -319,11 +316,11 @@ if df is not None:
     else:
         trend = "Sideways"
 
-    '''Breakout Alert: If Price Moves Significantly Above/Below SMA'''
+    # '''Breakout Alert: If Price Moves Significantly Above/Below SMA'''
 
-    if latest_price > latest_sma * 1.05:  # If price is 5% above SMA
+    if latest_price > latest_sma * 1.05:  # If price is 5%(test) above SMA
         breakout_alert = "Strong Uptrend (Breakout Above SMA)"
-    elif latest_price < latest_sma * 0.95:  # If price is 5% below SMA
+    elif latest_price < latest_sma * 0.95:  # If price is 5%(test) below SMA
         breakout_alert = "Potential Downtrend (Breakout Below SMA)"
     else:
         breakout_alert = "No Significant Breakout"
